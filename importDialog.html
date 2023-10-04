@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      color: #333;
+    }
+
+    p {
+      color: #555;
+    }
+
+    .drag-drop {
+      border: 2px dashed #ccc;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+
+    .drag-drop:hover {
+      background-color: #f0f0f0;
+    }
+
+    .drag-drop label {
+      font-size: 18px;
+      color: #555;
+    }
+
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .mapping-table th,
+    .mapping-table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+
+    select {
+      width: 100%;
+      padding: 5px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .button-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Styles for the OK button */
+     #okButtonContainer {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  #okButton {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: inline-block; /* Add this line to make the button visible */
+  }
+
+  #okButton:hover {
+    background-color: #0056b3;
+  }
+
+  #footer{
+    margin-top: 10px;
+    font-size: 14px;
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 align = "center">CSV Importer</h2>
+    <p>Drag and drop a CSV file here or click to select:</p>
+    
+    <div class="drag-drop" id="dropZone" ondragover="allowDrop(event)" ondrop="handleDrop(event)">
+      Drag &amp; Drop or
+      <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="handleFileSelect(event)">
+      <label for="fileInput">Click to Select a CSV File</label>
+    </div>
+
+    <p>Selected file: <span id="fileName"></span></p>
+
+    <table class="mapping-table">
+      <thead>
+        <tr>
+          <th>CSV Column</th>
+          <th>Google Sheets Column</th>
+        </tr>
+      </thead>
+      <tbody id="mappingBody">
+      </tbody>
+    </table>
+
+    <div class="button-container">
+      <button id="importButton" onclick="importCSV()" disabled>Import</button>
+      <button id="cancelButton" onclick="google.script.host.close()">Cancel</button>
+    </div>
+
+    
+    <div id="footer" align = "center">
+      <footer>&copyMade By Aryan Mehta</footer>
+    </div>
+  </div>
+
+  <script>
+    var selectedFile = null;
+    var csvHeaders = []; // CSV column headers
+    var columnMapping = []; // Mapping of CSV columns to Google Sheets columns
+
+    function allowDrop(event) {
+      event.preventDefault();
+    }
+
+    function handleDrop(event) {
+      event.preventDefault();
+      var files = event.dataTransfer.files;
+      if (files.length > 0) {
+        selectedFile = files[0];
+        document.getElementById("fileName").textContent = selectedFile.name;
+        document.getElementById("importButton").disabled = false;
+        parseCSVHeaders();
+      }
+    }
+
+    function handleFileSelect(event) {
+      selectedFile = event.target.files[0];
+      document.getElementById("fileName").textContent = selectedFile.name;
+      document.getElementById("importButton").disabled = false;
+      parseCSVHeaders();
+    }
+
+    function parseCSVHeaders() {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var csvData = e.target.result;
+        var lines = csvData.split('\n');
+        if (lines.length > 0) {
+          csvHeaders = lines[0].split(','); // Specify semicolon as the delimiter
+          generateMappingTable();
+        }
+      };
+      reader.readAsText(selectedFile);
+    }
+
+    function generateMappingTable() {
+      var mappingTable = document.getElementById("mappingBody");
+      mappingTable.innerHTML = '';
+      for (var i = 0; i < csvHeaders.length; i++) {
+        var row = document.createElement("tr");
+        var csvColumnCell = document.createElement("td");
+        csvColumnCell.textContent = csvHeaders[i];
+        var selectCell = document.createElement("td");
+        var select = document.createElement("select");
+        select.id = "select_" + i;
+
+        // Automatically set default dropdown value for each column
+        var defaultOption = document.createElement("option");
+        defaultOption.value = i; // Set the default value to the current index (incrementing)
+        defaultOption.textContent = (i + 1).toString(); // Increment the display value
+        defaultOption.selected = true;
+        select.appendChild(defaultOption);
+
+        row.appendChild(csvColumnCell);
+        selectCell.appendChild(select);
+        row.appendChild(selectCell);
+        mappingTable.appendChild(row);
+      }
+    }
+
+    function importCSV() {
+      columnMapping = [];
+      var selectElements = document.querySelectorAll("select");
+      for (var i = 0; i < selectElements.length; i++) {
+        var selectedValue = selectElements[i].value;
+        columnMapping.push(parseInt(selectedValue));
+      }
+
+      if (selectedFile) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var csvData = e.target.result;
+
+          // Show a loading message while importing
+          var container = document.querySelector(".container");
+          container.innerHTML = '<p>Importing data, please wait...</p>';
+
+          google.script.run.withSuccessHandler(showSuccessMessage).importCSVData(csvData, columnMapping);
+        };
+        reader.readAsText(selectedFile);
+      }
+    }
+
+    function showSuccessMessage(message) {
+  var container = document.querySelector(".container"); // Get the container div
+  container.innerHTML = ''; // Clear the existing content
+
+  // Create a new div to display the success message
+  var successMessageDiv = document.createElement("div");
+  successMessageDiv.textContent = message;
+  container.appendChild(successMessageDiv);
+
+  // Create and append the OK button to the container
+  var okButtonContainer = document.createElement("div");
+  okButtonContainer.id = "okButtonContainer"; // Set an ID for styling
+  var okButton = document.createElement("button");
+  okButton.textContent = "OK";
+  okButton.id = "okButton";
+  okButton.onclick = function () {
+    google.script.host.close(); // Close the window when OK is clicked
+  };
+  okButtonContainer.appendChild(okButton);
+  container.appendChild(okButtonContainer);
+}
+  </script>
+</body>
+</html>
+
